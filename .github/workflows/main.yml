@@ -1,0 +1,52 @@
+name: Build Capacitor Android App
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Code auschecken
+      uses: actions/checkout@v4
+
+    - name: ZIP entpacken
+      run: unzip -q *.zip -d . 
+    
+    - name: Node.js einrichten
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Java JDK einrichten (für Android)
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: App bauen
+      run: |
+        WORK_DIR=$(dirname $(find . -name "package.json" | head -n 1))
+        cd $WORK_DIR
+        npm install
+        npm run build
+        
+        # Android-Plattform hinzufügen
+        npm install @capacitor/android
+        npx cap add android
+        npx cap sync android
+        
+        # App bauen
+        chmod +x ./android/gradlew
+        cd android
+        ./gradlew assembleDebug
+        echo "APK_PATH=$WORK_DIR/android/app/build/outputs/apk/debug/app-debug.apk" >> $GITHUB_ENV
+
+    - name: Fertige APK bereitstellen
+      uses: actions/upload-artifact@v4
+      with:
+        name: Capacitor-App-APK
+        path: ${{ env.APK_PATH }}
